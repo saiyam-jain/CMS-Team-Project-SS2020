@@ -314,8 +314,10 @@ MonoBehaviour:
   dimension: 1024
   numberOfParticles: 524280
   shader: {fileID: 7200000, guid: 2012a21198d7a5448b05e294918919ef, type: 3}
-  decay: 0.042
-  sensorAngleDegrees: 21.8
-  rotationAngleDegrees: 45
-  sensorOffsetDistance: 0.02
+  startRadius: 0.51
+  deposit: 0.5
+  decay: 0.081
+  sensorAngleDegrees: 8.4
+  rotationAngleDegrees: 34.7
+  sensorOffsetDistance: 0.01
   stepSize: 0.001
