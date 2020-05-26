@@ -24,7 +24,7 @@ uint wang_hash(uint seed)
 
 float wang_float(uint hash)
 {
-	return hash / float(0x7FFFFFFF) / 2.0;
+	return wang_hash(hash) / float(0x7FFFFFFF) / 2.0;
 }
 
 float directTo(float2 pos, float2 directedPos)
@@ -43,7 +43,7 @@ float insideCircle(float2 v, float2 center, float radius)
 // Returns -1 or 1
 float randomSign(float v)
 {
-	float x = wang_float(wang_hash(v));
+	float x = wang_float(v);
 	return (step(0.5, x)*2.0) - 1.0;
 }
 
@@ -53,6 +53,8 @@ float rotationAngle;
 float sensorOffsetDistance;
 float stepSize;
 float decay;
+float deposit;
+float startRadius;
 
 RWStructuredBuffer<Particle> particleBuffer; // 1D array of Particle structs
 RWTexture2D<float4> TrailBuffer; // 2D Grid of float4
@@ -61,12 +63,15 @@ RWTexture2D<float4> TrailBuffer; // 2D Grid of float4
 void Init(uint3 id: SV_DISPATCHTHREADID)
 {
 	// Give each particular a random initialisation position..
-	float x = wang_float(wang_hash(id.x)) * 0.5 + 0.25;
-	float y = wang_float(wang_hash(id.x + 1)) * 0.5 + 0.25;
-	float2 pos = float2(x, y);
+	float x = (wang_float(id.x) - 0.5f) * startRadius;
+	float y = (wang_float(id.x + 17) - 0.5f) * startRadius;
+	float2 pos = float2(x, y) + float2(0.5, 0.5);
 
-	// Every particle begins by looking towards x=0.5 y=0.5
-	float angle = directTo(pos, float2(0.5, 0.5));
+	// Every particle begins with a random direction
+	float angle = wang_float(id.x + 123) * 6.283185307179586476925286766559;
+
+	// Every particle begins by looking toards x=0.5 y=0.5
+//	float angle = directTo(pos, float2(0.5, 0.5));
 
 	particleBuffer[id.x].pos = pos;
 	particleBuffer[id.x].angle = angle;
@@ -78,10 +83,10 @@ void MoveParticles(uint3 id: SV_DISPATCHTHREADID)
 	float angle = particleBuffer[id.x].angle;
 	float2 pos = particleBuffer[id.x].pos;
 
-	// Calculate 2D coordinates of the 3 sensing positions	
-	float2 frontPos = pos + float2(cos(angle) *sensorOffsetDistance, sin(angle) *sensorOffsetDistance);
-	float2 frontLeftPos = pos + float2(cos(angle + sensorAngle) *sensorOffsetDistance, sin(angle + sensorAngle) *sensorOffsetDistance);
-	float2 frontRightPos = pos + float2(cos(angle - sensorAngle) *sensorOffsetDistance, sin(angle - sensorAngle) *sensorOffsetDistance);
+	// Calculate 2D coordinates of the 3 sensing positions
+	float2 frontPos = frac(pos + float2(cos(angle) *sensorOffsetDistance, sin(angle) *sensorOffsetDistance));
+	float2 frontLeftPos = frac(pos + float2(cos(angle + sensorAngle) *sensorOffsetDistance, sin(angle + sensorAngle) *sensorOffsetDistance));
+	float2 frontRightPos = frac(pos + float2(cos(angle - sensorAngle) *sensorOffsetDistance, sin(angle - sensorAngle) *sensorOffsetDistance));
 
 	// Read the chemical value of the 3 sensing positions from the trailbuffer
 	float F = TrailBuffer[frontPos * trailDimension.xy].x;
@@ -125,7 +130,7 @@ void MoveParticles(uint3 id: SV_DISPATCHTHREADID)
 
 	// Write chemical trail to TrailBuffer
 	const float2 xy = nextPos * trailDimension;
-	TrailBuffer[xy] += float4(1.0, 0.0, 0.0, 0.0);
+	TrailBuffer[xy] += deposit; // float4(1.0, 0.0, 0.0, 0.0);
 }
 
 // Update the "Environment" TrailBuffer
@@ -149,7 +154,7 @@ void StepTrail(uint3 id : SV_DISPATCHTHREADID)
 
 	value = (value / 9) * (1 - decay);
 
-						//		Red	Green	Blue	Alpha
-	TrailBuffer[id.xy] = float4(value, value, value, value);
+									//		Red	Green	Blue	Alpha
+	TrailBuffer[id.xy] = value;		// float4(value, value, value, value);
 }
 

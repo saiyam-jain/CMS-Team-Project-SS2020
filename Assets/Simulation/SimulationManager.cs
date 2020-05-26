@@ -10,11 +10,13 @@ public class SimulationManager : MonoBehaviour
 	[SerializeField] private ComputeShader shader;
 
 	[Header("Run time parameters")]
+	[Range(0f, 1.0f)] public float startRadius = 0.5f;
+	[Range(0f, 1f)] public float deposit = 1.0f;
 	[Range(0f, 1f)] public float decay = 0.002f;
 	[Range(0f, 180f)] public float sensorAngleDegrees = 45f;  //in degrees
 	[Range(0f, 180f)] public float rotationAngleDegrees = 45f;//in degrees
-	[Range(0f, 1f)] public float sensorOffsetDistance = 0.01f;
-	[Range(0f, 1f)] public float stepSize = 0.001f;
+	[Range(0f, 0.1f)] public float sensorOffsetDistance = 0.01f;
+	[Range(0f, 0.01f)] public float stepSize = 0.001f;
 
 	private float sensorAngle;              //in radians
 	private float rotationAngle;            //in radians
@@ -57,6 +59,7 @@ public class SimulationManager : MonoBehaviour
 		particleHandle = shader.FindKernel("MoveParticles");
 		trailHandle = shader.FindKernel("StepTrail");
 
+		UpdateRuntimeParameters();
 		InitializeParticles();
 		InitializeTrail();
 	}
@@ -83,11 +86,15 @@ public class SimulationManager : MonoBehaviour
 
 	void InitializeTrail()
 	{
-		trail = new RenderTexture(dimension, dimension, 24);
+		// By default, a ARGB32 texture is created. Currently we are only using the R channel,
+		// so this could be changed to just RenderTextureFormat.R8
+		// But note that you must also change RWTexture2D<float4> TrailBuffer; declaration in the compute shader 
+		trail = new RenderTexture(dimension, dimension, 24); //, RenderTextureFormat.R8); //, RenderTextureFormat.ARGBFloat);
 		trail.enableRandomWrite = true;
 		trail.Create();
 		Debug.Log(trail.format);
 
+		// Set the TrailBuffer as the texture of the material of this objects
 		var rend = GetComponent<Renderer>();
 		rend.material.mainTexture = trail;
 
@@ -102,6 +109,7 @@ public class SimulationManager : MonoBehaviour
 		UpdateParticles();
 		UpdateTrail();
 	}
+
 	void UpdateRuntimeParameters()
 	{
 		sensorAngle = sensorAngleDegrees * 0.0174533f;
@@ -111,6 +119,8 @@ public class SimulationManager : MonoBehaviour
 		shader.SetFloat("sensorOffsetDistance", sensorOffsetDistance);
 		shader.SetFloat("stepSize", stepSize);
 		shader.SetFloat("decay", decay);
+		shader.SetFloat("deposit", deposit);
+		shader.SetFloat("startRadius", startRadius);
 	}
 
 	void UpdateParticles()
