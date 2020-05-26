@@ -91,7 +91,7 @@ void MoveParticles(uint3 id: SV_DISPATCHTHREADID)
 	// Decide on the next best step
 	if ((F > FL) && (F > FR))
 	{
-		angle -= rotationAngle;
+//		angle -= rotationAngle;
 	}
 	else if ((F < FL) && (F < FR)) // Forward is less than Left and Right, so turn randomly
 	{
