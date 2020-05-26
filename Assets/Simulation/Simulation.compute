@@ -1,0 +1,149 @@
+﻿// Physarum - implementation of Physarum like behaciour on compute shader
+// author: Deniz Bicer
+// https://github.com/DenizBicer/Physarum
+
+#pragma kernel Init
+#pragma kernel MoveParticles
+#pragma kernel StepTrail
+
+struct Particle
+{
+	float2 pos; 	// between 0-1
+	float angle;	// in radians
+};
+
+uint wang_hash(uint seed)
+{
+	seed = (seed ^ 61) ^ (seed >> 16);
+	seed *= 9;
+	seed = seed ^ (seed >> 4);
+	seed *= 0x27d4eb2d;
+	seed = seed ^ (seed >> 15);
+	return seed;
+}
+
+float wang_float(uint hash)
+{
+	return hash / float(0x7FFFFFFF) / 2.0;
+}
+
+float directTo(float2 pos, float2 directedPos)
+{
+	float2 direction = directedPos - pos;
+	return atan2(direction.y, direction.x);
+}
+
+//return 1 if v inside the circle, return 0 otherwise
+float insideCircle(float2 v, float2 center, float radius)
+{
+	float2 position = v - center;
+	return (step(radius, length(position)) + 1.0) % 2.0;
+}
+
+// Returns -1 or 1
+float randomSign(float v)
+{
+	float x = wang_float(wang_hash(v));
+	return (step(0.5, x)*2.0) - 1.0;
+}
+
+float2 trailDimension;
+float sensorAngle;
+float rotationAngle;
+float sensorOffsetDistance;
+float stepSize;
+float decay;
+
+RWStructuredBuffer<Particle> particleBuffer; // 1D array of Particle structs
+RWTexture2D<float4> TrailBuffer; // 2D Grid of float4
+
+[numthreads(8, 1, 1)]
+void Init(uint3 id: SV_DISPATCHTHREADID)
+{
+	// Give each particular a random initialisation position..
+	float x = wang_float(wang_hash(id.x));
+	float y = wang_float(wang_hash(id.x + 1));
+	float2 pos = float2(x, y);
+
+	// Every particle begins by looking towards x=0.5 y=0.5
+	float angle = directTo(pos, float2(0.5, 0.5));
+
+	particleBuffer[id.x].pos = pos;
+	particleBuffer[id.x].angle = angle;
+}
+
+[numthreads(8, 1, 1)]
+void MoveParticles(uint3 id: SV_DISPATCHTHREADID)
+{
+	float angle = particleBuffer[id.x].angle;
+	float2 pos = particleBuffer[id.x].pos;
+
+	// Calculate 2D coordinates of the 3 sensing positions	
+	float2 frontPos = pos + float2(cos(angle) *sensorOffsetDistance, sin(angle) *sensorOffsetDistance);
+	float2 frontLeftPos = pos + float2(cos(angle + sensorAngle) *sensorOffsetDistance, sin(angle + sensorAngle) *sensorOffsetDistance);
+	float2 frontRightPos = pos + float2(cos(angle - sensorAngle) *sensorOffsetDistance, sin(angle - sensorAngle) *sensorOffsetDistance);
+
+	// Read the chemical value of the 3 sensing positions from the trailbuffer
+	float F = TrailBuffer[frontPos * trailDimension.xy].x;
+	float FL = TrailBuffer[frontLeftPos * trailDimension.xy].x;
+	float FR = TrailBuffer[frontRightPos * trailDimension.xy].x;
+
+	// Decide on the next best step
+	if ((F > FL) && (F > FR))
+	{
+		angle -= rotationAngle;
+	}
+	else if ((F < FL) && (F < FR)) // Forward is less than Left and Right, so turn randomly
+	{
+		angle = angle + rotationAngle * randomSign(id.x);
+	}
+	else if (FL < FR) 
+	{
+		angle -= rotationAngle;
+	}
+	else if (FR < FL)
+	{
+		angle += rotationAngle;
+	}
+
+	// Calculate new position
+	float2 nextPos = pos + float2(cos(angle) * stepSize, sin(angle) * stepSize);
+
+	// Check if nextPos is within the boundries
+	float t1 = insideCircle(nextPos, float2(0.5, 0.5), 0.5); //return 1 if v inside the circle, return 0 otherwise
+	angle = angle + rotationAngle * randomSign(id.x + 1) * (t1 - 1);
+	nextPos = saturate(nextPos*t1 + pos * (1 - t1)); // saturate clamps the specified value within the range of 0 to 1.
+
+	// Store new particle position and angle in particleBuffer
+	particleBuffer[id.x].pos = nextPos;
+	particleBuffer[id.x].angle = angle;
+
+	// Write chemical trail to TrailBuffer
+	const float2 xy = nextPos * trailDimension;
+	TrailBuffer[xy] += float4(1.0, 0.0, 0.0, 0.0);
+}
+
+// Update the "Environment" TrailBuffer
+[numthreads(8, 8, 1)]
+void StepTrail(uint3 id : SV_DISPATCHTHREADID)
+{
+	float value = TrailBuffer[id.xy].x;
+
+	float3 d = float3(1, -1, 0.0);
+
+	//mean filter
+	value = value;
+	value += TrailBuffer[id.xy - d.xx].x; // -1,-1
+	value += TrailBuffer[id.xy - d.zx].x; // 0, -1
+	value += TrailBuffer[id.xy - d.yx].x; // +1, -1
+	value += TrailBuffer[id.xy - d.xz].x; // -1, 0
+	value += TrailBuffer[id.xy + d.xz].x; // +1, 0
+	value += TrailBuffer[id.xy + d.yx].x; // -1, +1
+	value += TrailBuffer[id.xy + d.zx].x; // 0, +1
+	value += TrailBuffer[id.xy + d.xx].x; // +1, +1
+
+	value = (value / 9) * (1 - decay);
+
+	TrailBuffer[id.xy] = float4(value, value, value, value);
+}
+
