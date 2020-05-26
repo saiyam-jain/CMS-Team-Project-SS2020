@@ -61,8 +61,8 @@ RWTexture2D<float4> TrailBuffer; // 2D Grid of float4
 void Init(uint3 id: SV_DISPATCHTHREADID)
 {
 	// Give each particular a random initialisation position..
-	float x = wang_float(wang_hash(id.x));
-	float y = wang_float(wang_hash(id.x + 1));
+	float x = wang_float(wang_hash(id.x)) * 0.5 + 0.25;
+	float y = wang_float(wang_hash(id.x + 1)) * 0.5 + 0.25;
 	float2 pos = float2(x, y);
 
 	// Every particle begins by looking towards x=0.5 y=0.5
@@ -109,10 +109,15 @@ void MoveParticles(uint3 id: SV_DISPATCHTHREADID)
 	// Calculate new position
 	float2 nextPos = pos + float2(cos(angle) * stepSize, sin(angle) * stepSize);
 
+	// Keep the particles inside a circle...
 	// Check if nextPos is within the boundries
-	float t1 = insideCircle(nextPos, float2(0.5, 0.5), 0.5); //return 1 if v inside the circle, return 0 otherwise
-	angle = angle + rotationAngle * randomSign(id.x + 1) * (t1 - 1);
-	nextPos = saturate(nextPos*t1 + pos * (1 - t1)); // saturate clamps the specified value within the range of 0 to 1.
+//	float t1 = insideCircle(nextPos, float2(0.5, 0.5), 0.5); //return 1 if v inside the circle, return 0 otherwise
+//	angle = angle + rotationAngle * randomSign(id.x + 1) * (t1 - 1);
+//	nextPos = saturate(nextPos*t1 + pos * (1 - t1)); // saturate clamps the specified value within the range of 0 to 1.
+
+
+	// Or more simply, wrap the particles around to the other side...
+	nextPos = frac(nextPos); // frac() keeps the fraction part only so 1.02 -> 0.02 and -0.02 -> 0.098
 
 	// Store new particle position and angle in particleBuffer
 	particleBuffer[id.x].pos = nextPos;
@@ -144,6 +149,7 @@ void StepTrail(uint3 id : SV_DISPATCHTHREADID)
 
 	value = (value / 9) * (1 - decay);
 
+						//		Red	Green	Blue	Alpha
 	TrailBuffer[id.xy] = float4(value, value, value, value);
 }
 

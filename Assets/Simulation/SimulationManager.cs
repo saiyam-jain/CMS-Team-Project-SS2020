@@ -86,6 +86,7 @@ public class SimulationManager : MonoBehaviour
 		trail = new RenderTexture(dimension, dimension, 24);
 		trail.enableRandomWrite = true;
 		trail.Create();
+		Debug.Log(trail.format);
 
 		var rend = GetComponent<Renderer>();
 		rend.material.mainTexture = trail;
