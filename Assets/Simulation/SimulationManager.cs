@@ -10,6 +10,7 @@ public class SimulationManager : MonoBehaviour
 	[SerializeField] private ComputeShader shader;
 
 	[Header("Run time parameters")]
+	public bool m_bActive = false;
 	[Range(0f, 1.0f)] public float startRadius = 0.5f;
 	[Range(0f, 1f)] public float deposit = 1.0f;
 	[Range(0f, 1f)] public float decay = 0.002f;
@@ -18,9 +19,14 @@ public class SimulationManager : MonoBehaviour
 	[Range(0f, 0.1f)] public float sensorOffsetDistance = 0.01f;
 	[Range(0f, 0.01f)] public float stepSize = 0.001f;
 
+	[Header("Interaction")]
+	public GameObject Pointer;
+	[Range(0f, 1f)] public float pointerRadius = 0.01f;
+	[Range(-1.0f, 1f)] public float pointerValue = 0.5f;	
+
 	private float sensorAngle;              //in radians
 	private float rotationAngle;            //in radians
-
+	private Vector2 pointerUV;
 	private RenderTexture trail;
 	private int initHandle, particleHandle, trailHandle;
 	private ComputeBuffer particleBuffer;
@@ -105,9 +111,53 @@ public class SimulationManager : MonoBehaviour
 	// Update is called once per frame
 	void Update()
 	{
+		UpdatePointers();
 		UpdateRuntimeParameters();
-		UpdateParticles();
-		UpdateTrail();
+
+		if (m_bActive)
+		{
+			UpdateParticles();
+			UpdateTrail();
+		}
+	}
+
+/*	void OnDrawGizmos()
+	{
+		// Draw a yellow sphere at the transform's position
+		Gizmos.color = Color.yellow;
+		Gizmos.DrawSphere(Pointer.transform.position, 1);
+	}
+	*/
+	void UpdatePointers()
+	{
+		if (Pointer == null)
+			return;
+
+
+		// We are going to shoot a ray out from our Pointer GameObject, in the Forward (+Z) direction 
+		// and calculate where it intersects with our Simulation "Plane" object.
+
+		RaycastHit hit;
+
+		// Pointer is GameObject. Every GameObject has a member struct called "transform"
+		Vector3 end = Pointer.transform.position + Pointer.transform.forward * 10;
+		Debug.DrawLine(Pointer.transform.position, end, Color.green);
+
+		if (!Physics.Raycast(Pointer.transform.position, Pointer.transform.forward, out hit))
+		{
+			// No intersection.. Lets change the color to green and return
+			Pointer.GetComponent<Renderer>().material.color = Color.green;
+			return;
+		}
+		// Note, we could also use a ray cast from camera through the mouse also... 
+		//	if (!Physics.Raycast(cam.ScreenPointToRay(Input.mousePosition), out hit))
+
+		// Hit!.  Change colour of Pointer to red and draw a red line to the hit point
+		Pointer.GetComponent<Renderer>().material.color = Color.red;
+		Debug.DrawLine(Pointer.transform.position, hit.point, Color.red);
+
+		// Retrieve the UV coordinates of the hit point. These are the simulation-space coordinates.
+		pointerUV = hit.textureCoord;
 	}
 
 	void UpdateRuntimeParameters()
@@ -121,6 +171,9 @@ public class SimulationManager : MonoBehaviour
 		shader.SetFloat("decay", decay);
 		shader.SetFloat("deposit", deposit);
 		shader.SetFloat("startRadius", startRadius);
+		shader.SetVector("pointerUV", pointerUV);
+		shader.SetFloat("pointerRadius", pointerRadius);
+		shader.SetFloat("pointerValue", pointerValue);
 	}
 
 	void UpdateParticles()

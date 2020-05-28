@@ -55,6 +55,9 @@ float stepSize;
 float decay;
 float deposit;
 float startRadius;
+float2 pointerUV;
+float pointerRadius;
+float pointerValue;
 
 RWStructuredBuffer<Particle> particleBuffer; // 1D array of Particle structs
 RWTexture2D<float4> TrailBuffer; // 2D Grid of float4
@@ -120,7 +123,6 @@ void MoveParticles(uint3 id: SV_DISPATCHTHREADID)
 //	angle = angle + rotationAngle * randomSign(id.x + 1) * (t1 - 1);
 //	nextPos = saturate(nextPos*t1 + pos * (1 - t1)); // saturate clamps the specified value within the range of 0 to 1.
 
-
 	// Or more simply, wrap the particles around to the other side...
 	nextPos = frac(nextPos); // frac() keeps the fraction part only so 1.02 -> 0.02 and -0.02 -> 0.098
 
@@ -128,33 +130,37 @@ void MoveParticles(uint3 id: SV_DISPATCHTHREADID)
 	particleBuffer[id.x].pos = nextPos;
 	particleBuffer[id.x].angle = angle;
 
-	// Write chemical trail to TrailBuffer
+	// Write chemical trail into TrailBuffer in z-channel
 	const float2 xy = nextPos * trailDimension;
-	TrailBuffer[xy] += deposit; // float4(1.0, 0.0, 0.0, 0.0);
+	TrailBuffer[xy] += float4(deposit, 0.0, 0.0, 0.0);
 }
 
 // Update the "Environment" TrailBuffer
 [numthreads(8, 8, 1)]
 void StepTrail(uint3 id : SV_DISPATCHTHREADID)
 {
-	float value = TrailBuffer[id.xy].x;
-
-	float3 d = float3(1, -1, 0.0);
+	float2 uv = id.xy / trailDimension.xy; // 1024 x 1024
+	float4 value = TrailBuffer[id.xy];
 
 	//mean filter
-	value = value;
-	value += TrailBuffer[id.xy - d.xx].x; // -1,-1
-	value += TrailBuffer[id.xy - d.zx].x; // 0, -1
-	value += TrailBuffer[id.xy - d.yx].x; // +1, -1
-	value += TrailBuffer[id.xy - d.xz].x; // -1, 0
-	value += TrailBuffer[id.xy + d.xz].x; // +1, 0
-	value += TrailBuffer[id.xy + d.yx].x; // -1, +1
-	value += TrailBuffer[id.xy + d.zx].x; // 0, +1
-	value += TrailBuffer[id.xy + d.xx].x; // +1, +1
+	const float3 d = float3(1, -1, 0.0);
+	value.x += TrailBuffer[id.xy - d.xx].x; // -1,-1
+	value.x += TrailBuffer[id.xy - d.zx].x; // 0, -1
+	value.x += TrailBuffer[id.xy - d.yx].x; // +1, -1
+	value.x += TrailBuffer[id.xy - d.xz].x; // -1, 0
+	value.x += TrailBuffer[id.xy + d.xz].x; // +1, 0
+	value.x += TrailBuffer[id.xy + d.yx].x; // -1, +1
+	value.x += TrailBuffer[id.xy + d.zx].x; // 0, +1
+	value.x += TrailBuffer[id.xy + d.xx].x; // +1, +1
 
-	value = (value / 9) * (1 - decay);
+	value.x = (value.x / 9) * (1 - decay);
 
-									//		Red	Green	Blue	Alpha
-	TrailBuffer[id.xy] = value;		// float4(value, value, value, value);
+	// Lets draw into the .y channel of our trail map at the pointer...
+	float distanceToPointer = length(uv - pointerUV);
+	float pointerStrength = step(distanceToPointer, pointerRadius) * pointerValue; // 1 or 0
+	value.x += pointerStrength;
+
+						//		Red	Green	Blue	Alpha
+	TrailBuffer[id.xy] = float4(value.x, value.x, value.x, 1.0f);		// float4(value.x, value.y, value.z, value.w);
 }
 
