@@ -8,6 +8,10 @@ public class Simulation : MonoBehaviour
     public int dimension = 1024;
     public int numberOfParticles = 524280;
     [SerializeField] private ComputeShader shader;
+    public ComputeShader Shader
+    {
+        get { return shader; }
+    }
 
     [Header("Run time parameters")]
     [Range(0f, 1.0f)] public float startRadius = 0.5f;
@@ -20,13 +24,13 @@ public class Simulation : MonoBehaviour
 
     [Header("Interaction")]
     //	public GameObject Pointer;
-    [Range(0f, 1f)] public float mouseRadius = 0.01f;
+   // [Range(0f, 1f)] public float mouseRadius = 0.01f;
     [Range(-1.0f, 1f)] public float pointerValue = 0.5f;
 
     private float sensorAngle;              //in radians
     private float rotationAngle;            //in radians
                                             //	private Vector2 pointerUV;
-    private Vector2 mouseUV;
+   // private Vector2 mouseUV;
     private RenderTexture trail;
     private int initHandle, particleHandle, trailHandle;
     private ComputeBuffer particleBuffer;
@@ -125,36 +129,6 @@ public class Simulation : MonoBehaviour
         }
         */
 
-    private void OnMouseOver() //Runs when mouse is hovering on the simulation.
-    {
-        RaycastHit hit;
-        Ray rayOrigin = Camera.main.ScreenPointToRay(Input.mousePosition);
-
-        //Using mouse scroll to vary the radius.
-        if (Input.mouseScrollDelta.y < 0)
-            mouseRadius -= 0.01f;
-        else if (Input.mouseScrollDelta.y > 0)
-            mouseRadius += 0.01f;
-
-        if (mouseRadius <= 0 && Input.mouseScrollDelta.y > 0)
-            mouseRadius = 0.01f;
-
-        if (!Physics.Raycast(rayOrigin, out hit))
-        {
-            return;
-        }
-
-        shader.SetFloat("mouseRadius", mouseRadius);
-        mouseUV = hit.textureCoord;     //Passing mouse Tex Coord to GPU
-    }
-
-    private void OnMouseExit()
-    {
-        Debug.Log("Mouse is not on Simulation");
-        shader.SetFloat("mouseRadius", 0);
-        return;
-    }
-
     /*void UpdatePointers()
 	{
 		if (Pointer == null)
@@ -198,8 +172,7 @@ public class Simulation : MonoBehaviour
         shader.SetFloat("decay", decay);
         shader.SetFloat("deposit", deposit);
         shader.SetFloat("startRadius", startRadius);
-        //		shader.SetVector("pointerUV", pointerUV);
-        shader.SetVector("mouseUV", mouseUV);
+        //shader.SetVector("pointerUV", pointerUV);
         shader.SetFloat("pointerValue", pointerValue);
     }
 
