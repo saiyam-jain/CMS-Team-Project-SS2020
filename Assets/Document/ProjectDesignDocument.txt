@@ -1,0 +1,42 @@
+Project: CMS Team Project SS2020
+
+Theme: Interactive Simulation in 3d with Multiuser
+
+Target Platform: VR (3D), Oculus Quest
+
+Engine: Unity
+
+Supervisor: Jun. Prof. Dr Matthew McGinity
+
+Team Members:
+Mounika
+Saiyam
+Sandeep
+Satya
+
+Github Link: github.com/saiyam-jain/CMS-Team-Project-SS2020
+
+Project Description and Goal:
+--> Obtain a simulation (Possibly a 3D simulation)
+--> Add realtime interactions to the simulation
+--> Create a multiuser interface
+--> Synchronise users actions in the network
+--> VR visualisation of the simulation
+
+Activity log:
+
+--> Obtain a simulation (Possibly a 3D simulation)
+// Physarum simulation is used as shown by prof. MM:  https://sagejenson.com/physarum
+// Try to upgrade to a 3D simulation, Example: https://sagejenson.com/physarum
+
+--> Add realtime interactions to the simulation
+// Added a pointer interaction by prof.MM
+// Changed pointer to cursor with cursor radius control using scroll
+// More interaction to be added
+
+--> Create a multiuser interface
+// Added Photon Unity Networking package (PUN 2 - Free) (Upto 20 users)
+// 
+
+--> Synchronise users actions in the network
+--> VR visualisation of the simulation
